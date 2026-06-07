@@ -1,12 +1,20 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* YouTube 임베드 플레이어 — 미니 플레이어 안에 작게 표시 (백그라운드 재생 필수) */
+/* YouTube 임베드 플레이어 — visibility로 숨김 (display:none 쓰면 초기화 실패) */
 #ytPlayerWrap {
   width: 64px;
   height: 48px;
   border-radius: 6px;
   overflow: hidden;
   flex-shrink: 0;
+  visibility: hidden;
+  width: 0;
+  height: 0;
+}
+#ytPlayerWrap.yt-active {
+  visibility: visible;
+  width: 64px;
+  height: 48px;
 }
 #ytPlayerWrap iframe {
   width: 64px;
