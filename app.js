@@ -70,6 +70,50 @@ const Storage = {
   }
 };
 
+// ── YouTube 리졸버 ────────────────────────────────────
+const YouTube = {
+  // Piped 공개 인스턴스 목록 (순서대로 시도)
+  APIS: [
+    'https://pipedapi.kavin.rocks',
+    'https://pipedapi.adminforge.de',
+    'https://piped-api.garudalinux.org',
+  ],
+
+  extractId(url) {
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('?')[0];
+      if (u.hostname.includes('youtube.com')) return u.searchParams.get('v');
+    } catch {}
+    return null;
+  },
+
+  isYouTube(url) {
+    return /youtube\.com|youtu\.be/.test(url);
+  },
+
+  async resolve(url) {
+    const id = this.extractId(url);
+    if (!id) throw new Error('유효하지 않은 YouTube URL입니다');
+
+    for (const base of this.APIS) {
+      try {
+        const res = await fetch(`${base}/streams/${id}`, { signal: AbortSignal.timeout(6000) });
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        // 오디오 전용 스트림 중 가장 높은 bitrate 선택
+        const stream = (data.audioStreams || [])
+          .filter(s => s.url && s.mimeType)
+          .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
+        if (stream?.url) return stream.url;
+      } catch {}
+    }
+    throw new Error('YouTube 오디오를 가져올 수 없습니다. 영상이 비공개이거나 지역 제한이 있을 수 있습니다');
+  }
+};
+
 // ── 오디오 컨트롤러 ───────────────────────────────────
 const AudioCtrl = (() => {
   // iOS: 오디오 엘리먼트를 앱 전체에서 하나만 유지해야 백그라운드 세션 유지
@@ -579,13 +623,23 @@ const App = {
       UI.inputUrl.focus();
       return;
     }
-    UI.urlError.textContent = url.startsWith('http://')
-      ? 'HTTPS URL을 권장합니다. HTTP는 일부 브라우저에서 차단될 수 있습니다.'
-      : '';
+    if (url.startsWith('http://')) {
+      UI.urlError.textContent = 'HTTPS URL을 권장합니다. HTTP는 일부 브라우저에서 차단될 수 있습니다.';
+    } else if (YouTube.isYouTube(url) && !YouTube.extractId(url)) {
+      UI.urlError.textContent = '유효하지 않은 YouTube URL입니다.';
+      UI.inputUrl.focus();
+      return;
+    } else {
+      UI.urlError.textContent = '';
+    }
 
     let displayName = name;
     if (!displayName) {
-      try { displayName = new URL(url).hostname; } catch { displayName = url; }
+      if (YouTube.isYouTube(url)) {
+        displayName = 'YouTube — ' + (YouTube.extractId(url) || url);
+      } else {
+        try { displayName = new URL(url).hostname; } catch { displayName = url; }
+      }
     }
 
     const playlistId = UI.selectPlaylist.value || Storage.ALL_ID;
@@ -672,14 +726,30 @@ const App = {
     this._playFromQueue(this._queue.findIndex(s => s.id === id));
   },
 
-  _playFromQueue(idx) {
+  async _playFromQueue(idx) {
     const stream = this._queue[idx];
     if (!stream) return;
     this._queueIdx = idx;
     this.currentId = stream.id;
     this.state = 'loading';
     this._render();
-    AudioCtrl.play(stream);
+
+    let playUrl = stream.url;
+
+    // YouTube URL이면 Piped API로 직접 스트림 URL 변환
+    if (YouTube.isYouTube(stream.url)) {
+      try {
+        playUrl = await YouTube.resolve(stream.url);
+      } catch (err) {
+        this.state = 'error';
+        this._render();
+        UI.showToast(err.message, 4000);
+        return;
+      }
+    }
+
+    AudioCtrl.play({ ...stream, url: playUrl });
+
     // Media Session 이전/다음 핸들러 업데이트
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('previoustrack',
