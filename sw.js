@@ -1,4 +1,4 @@
-const CACHE = 'streamlink-v6';
+const CACHE = 'streamlink-v7';
 const STATIC = ['/style.css', '/manifest.json', '/icons/icon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
