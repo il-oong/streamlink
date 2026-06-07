@@ -82,110 +82,17 @@ const YouTube = {
   },
   isYouTube(url) {
     return /youtube\.com|youtu\.be/.test(url);
+  },
+  async resolve(url) {
+    const id = this.extractId(url);
+    if (!id) throw new Error('유효하지 않은 YouTube URL입니다');
+    const res = await fetch(`/api/youtube?id=${id}`, { signal: AbortSignal.timeout(20000) });
+    const data = await res.json();
+    if (!res.ok || !data.url) throw new Error(data.error || 'YouTube 오디오를 가져올 수 없습니다');
+    return data.url;
   }
 };
 
-// ── YouTube IFrame 컨트롤러 ───────────────────────────
-const YouTubeCtrl = (() => {
-  let player = null;
-  let _ready = false;
-  let _pending = null;   // { stream } 대기 중인 재생 요청
-  let _onStateChange = null;
-  let _onEnded = null;
-  let _currentStream = null;
-  let currentId = null;
-
-  function _setMediaSession(stream) {
-    if (!('mediaSession' in navigator)) return;
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: stream.name, artist: 'StreamLink', album: 'YouTube'
-    });
-    navigator.mediaSession.playbackState = 'playing';
-  }
-
-  // YouTube IFrame API가 로드되면 자동 호출되는 전역 콜백
-  window.onYouTubeIframeAPIReady = function () {
-    player = new YT.Player('ytPlayerEl', {
-      height: '1', width: '1',
-      playerVars: { autoplay: 0, controls: 0, playsinline: 1, rel: 0 },
-      events: {
-        onReady() {
-          _ready = true;
-          if (_pending) {
-            _doPlay(_pending);
-            _pending = null;
-          }
-        },
-        onStateChange(e) {
-          if (e.data === YT.PlayerState.PLAYING) {
-            _onStateChange?.('playing', currentId);
-            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-          } else if (e.data === YT.PlayerState.PAUSED) {
-            _onStateChange?.('paused', currentId);
-            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-          } else if (e.data === YT.PlayerState.BUFFERING) {
-            _onStateChange?.('loading', currentId);
-          } else if (e.data === YT.PlayerState.ENDED) {
-            _onEnded?.();
-          }
-        },
-        onError() {
-          _onStateChange?.('error', currentId);
-        }
-      }
-    });
-  };
-
-  function _doPlay({ stream }) {
-    const videoId = YouTube.extractId(stream.url);
-    if (!videoId) { _onStateChange?.('error', currentId); return; }
-    player.loadVideoById(videoId);
-    _setMediaSession(stream);
-    _onStateChange?.('loading', currentId);
-  }
-
-  function play(stream) {
-    _currentStream = stream;
-    currentId = stream.id;
-    if (!_ready) {
-      _pending = { stream };
-      _onStateChange?.('loading', currentId);
-      return;
-    }
-    _doPlay({ stream });
-  }
-
-  function pause() {
-    player?.pauseVideo();
-    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-  }
-
-  function resume() {
-    player?.playVideo();
-    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-  }
-
-  function stop() {
-    _currentStream = null;
-    currentId = null;
-    player?.stopVideo();
-    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
-    _onStateChange?.('stopped', null);
-  }
-
-  function setVolume(v) { player?.setVolume(v); }
-
-  function isActive() {
-    return player && player.getPlayerState?.() === YT.PlayerState.PLAYING;
-  }
-
-  return {
-    play, pause, resume, stop, setVolume, isActive,
-    get currentId() { return currentId; },
-    set onStateChange(fn) { _onStateChange = fn; },
-    set onEnded(fn) { _onEnded = fn; }
-  };
-})();
 
 // ── 오디오 컨트롤러 ───────────────────────────────────
 const AudioCtrl = (() => {
@@ -574,31 +481,22 @@ const App = {
     UI.updateMiniPlayer(current, this.state, queueIdx, this._queue.length);
   },
 
-  _activeCtrl() {
-    const s = this.streams.find(s => s.id === this.currentId);
-    return s && YouTube.isYouTube(s.url) ? YouTubeCtrl : AudioCtrl;
-  },
-
   _bindEvents() {
-    const onStateChange = (state, id) => {
+    AudioCtrl.onStateChange = (state, id) => {
       this.state = state;
       if (id !== null) this.currentId = id;
       if (state === 'stopped') this.currentId = null;
       this._render();
     };
-    AudioCtrl.onStateChange = onStateChange;
-    YouTubeCtrl.onStateChange = onStateChange;
 
-    const onEnded = () => {
+    AudioCtrl.onEnded = () => {
       const idx = this._queue.findIndex(s => s.id === this.currentId);
       if (idx >= 0 && idx < this._queue.length - 1) {
         this._playFromQueue(idx + 1);
       } else {
-        this._activeCtrl().stop();
+        AudioCtrl.stop();
       }
     };
-    AudioCtrl.onEnded = onEnded;
-    YouTubeCtrl.onEnded = onEnded;
 
     document.getElementById('btnAdd').addEventListener('click', () =>
       UI.showModal(this.playlists, this.activePlaylist)
@@ -675,21 +573,16 @@ const App = {
 
     // 미니 플레이어 버튼
     UI.btnPlayMini.addEventListener('click', () => {
-      const ctrl = this._activeCtrl();
       if (this.state === 'playing' || this.state === 'loading') {
-        ctrl.pause();
+        AudioCtrl.pause();
       } else if (this.state === 'error' && this.currentId) {
         this._retryPlay(this.currentId);
       } else if (this.currentId) {
-        ctrl.resume();
+        AudioCtrl.resume();
       }
     });
 
-    UI.volumeSlider.addEventListener('input', e => {
-      const v = Number(e.target.value);
-      AudioCtrl.setVolume(v);
-      YouTubeCtrl.setVolume(v);
-    });
+    UI.volumeSlider.addEventListener('input', e => AudioCtrl.setVolume(Number(e.target.value)));
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') { UI.hideModal(); UI.hidePlModal(); }
     });
@@ -738,7 +631,7 @@ const App = {
 
   _handleDelete(id) {
     if (id === this.currentId) {
-      this._activeCtrl().stop();
+      AudioCtrl.stop();
       this.currentId = null;
       this.state = 'stopped';
     }
@@ -782,7 +675,7 @@ const App = {
     this.streams = Storage.getAll();
     if (this.activePlaylist === id) this.activePlaylist = Storage.ALL_ID;
     if (this.currentId && !this.streams.find(s => s.id === this.currentId)) {
-      this._activeCtrl().stop();
+      AudioCtrl.stop();
       this.currentId = null;
       this.state = 'stopped';
     }
@@ -796,13 +689,12 @@ const App = {
     if (!stream) return;
 
     if (this.currentId === id) {
-      const ctrl = this._activeCtrl();
       if (this.state === 'playing' || this.state === 'loading') {
-        ctrl.pause();
+        AudioCtrl.pause();
       } else if (this.state === 'error') {
         this._retryPlay(id);
       } else {
-        ctrl.resume();
+        AudioCtrl.resume();
       }
       return;
     }
@@ -812,7 +704,7 @@ const App = {
     this._playFromQueue(this._queue.findIndex(s => s.id === id));
   },
 
-  _playFromQueue(idx) {
+  async _playFromQueue(idx) {
     const stream = this._queue[idx];
     if (!stream) return;
     this._queueIdx = idx;
@@ -820,22 +712,20 @@ const App = {
     this.state = 'loading';
     this._render();
 
-    const ytWrap = document.getElementById('ytPlayerWrap');
-    const waveform = document.getElementById('miniWaveform');
-
+    let playUrl = stream.url;
     if (YouTube.isYouTube(stream.url)) {
-      AudioCtrl.stop();
-      if (ytWrap) ytWrap.classList.add('yt-active');
-      if (waveform) waveform.hidden = true;
-      YouTubeCtrl.play(stream);
-    } else {
-      YouTubeCtrl.stop();
-      if (ytWrap) ytWrap.classList.remove('yt-active');
-      if (waveform) waveform.hidden = false;
-      AudioCtrl.play(stream);
+      try {
+        playUrl = await YouTube.resolve(stream.url);
+      } catch (err) {
+        this.state = 'error';
+        this._render();
+        UI.showToast(err.message, 4000);
+        return;
+      }
     }
 
-    // Media Session 이전/다음 핸들러 업데이트
+    AudioCtrl.play({ ...stream, url: playUrl });
+
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('previoustrack',
         idx > 0 ? () => this._playFromQueue(idx - 1) : null
@@ -847,15 +737,8 @@ const App = {
   },
 
   _retryPlay(id) {
-    const stream = this.streams.find(s => s.id === id);
-    if (!stream) return;
-    this.state = 'loading';
-    this._render();
-    if (YouTube.isYouTube(stream.url)) {
-      YouTubeCtrl.play(stream);
-    } else {
-      AudioCtrl.play(stream);
-    }
+    const idx = this._queue.findIndex(s => s.id === id);
+    if (idx >= 0) this._playFromQueue(idx);
   },
 
   _setupPWA() {
