@@ -29,7 +29,8 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request)
         .then(res => {
-          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          const copy = res.clone(); // body 소비 전에 즉시 clone
+          caches.open(CACHE).then(c => c.put(e.request, copy));
           return res;
         })
         .catch(() => caches.match(e.request))
