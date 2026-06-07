@@ -1,5 +1,16 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* YouTube 임베드 플레이어 — 화면 밖에 배치 (오디오만 사용) */
+#ytPlayerWrap {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 :root {
   --bg: #0f0f1a;
   --bg2: #1a1a2e;
