@@ -1,35 +1,27 @@
-const PIPED = [
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.adminforge.de',
-  'https://pipedapi.tokhmi.xyz',
-  'https://pipedapi.syncpundit.io',
-  'https://api.piped.projectsegfau.lt',
-];
-
 const INVIDIOUS = [
   'https://yewtu.be',
   'https://invidious.projectsegfau.lt',
   'https://inv.riverside.rocks',
   'https://yt.cdaut.de',
-  'https://invidious.nerdvpn.de',
   'https://iv.ggtyler.dev',
 ];
 
-async function tryPiped(id) {
-  for (const base of PIPED) {
-    try {
-      const r = await fetch(`${base}/streams/${id}`, {
-        signal: AbortSignal.timeout(6000),
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-      });
-      if (!r.ok) continue;
-      const data = await r.json();
-      const stream = (data.audioStreams || [])
-        .filter(s => s.url && s.mimeType)
-        .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-      if (stream?.url) return stream.url;
-    } catch {}
-  }
+async function tryCobalt(id) {
+  try {
+    const r = await fetch('https://api.cobalt.tools/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${id}`,
+        downloadMode: 'audio',
+        audioFormat: 'best',
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    if ((data.status === 'redirect' || data.status === 'tunnel') && data.url) return data.url;
+  } catch {}
   return null;
 }
 
@@ -55,7 +47,7 @@ module.exports = async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'id required' });
 
-  const url = (await tryPiped(id)) || (await tryInvidious(id));
+  const url = (await tryCobalt(id)) || (await tryInvidious(id));
 
   if (url) {
     res.setHeader('Cache-Control', 's-maxage=300');
