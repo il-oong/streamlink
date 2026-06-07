@@ -78,6 +78,10 @@
     <!-- 하단 미니 플레이어 -->
     <div class="mini-player" id="miniPlayer" hidden>
       <div class="mini-player-info">
+        <!-- YouTube 재생 중일 때 표시 (백그라운드 재생을 위해 반드시 visible) -->
+        <div id="ytPlayerWrap" hidden>
+          <div id="ytPlayerEl"></div>
+        </div>
         <div class="mini-waveform" id="miniWaveform">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
@@ -189,10 +193,7 @@
   <!-- 토스트 알림 -->
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <!-- YouTube IFrame API (임베드 재생용) -->
-  <div id="ytPlayerWrap">
-    <div id="ytPlayerEl"></div>
-  </div>
+  <!-- YouTube IFrame API (임베드 재생용 — 미니 플레이어 안에서 표시) -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="app.js"></script>
 </body>

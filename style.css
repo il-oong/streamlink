@@ -1,14 +1,17 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* YouTube 임베드 플레이어 — 화면 밖에 배치 (오디오만 사용) */
+/* YouTube 임베드 플레이어 — 미니 플레이어 안에 작게 표시 (백그라운드 재생 필수) */
 #ytPlayerWrap {
-  position: fixed;
-  top: -9999px;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
+  width: 64px;
+  height: 48px;
+  border-radius: 6px;
   overflow: hidden;
-  pointer-events: none;
+  flex-shrink: 0;
+}
+#ytPlayerWrap iframe {
+  width: 64px;
+  height: 48px;
+  border: none;
 }
 
 :root {
