@@ -74,9 +74,12 @@ const Storage = {
 const YouTube = {
   // Piped 공개 인스턴스 목록 (순서대로 시도)
   APIS: [
+    'https://pipedapi.tokhmi.xyz',
+    'https://pipedapi.moomoo.me',
+    'https://pipedapi.syncpundit.io',
+    'https://api.piped.projectsegfau.lt',
     'https://pipedapi.kavin.rocks',
     'https://pipedapi.adminforge.de',
-    'https://piped-api.garudalinux.org',
   ],
 
   extractId(url) {
