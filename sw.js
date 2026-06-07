@@ -1,4 +1,4 @@
-const CACHE = 'streamlink-v4';
+const CACHE = 'streamlink-v5';
 const STATIC = ['/style.css', '/manifest.json', '/icons/icon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -18,15 +18,18 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+
+  // 외부 오디오 스트림은 SW가 절대 가로채지 않음
+  if (url.origin !== self.location.origin) return;
+
   const path = url.pathname;
 
-  // HTML, JS: 네트워크 우선 → 실패 시 캐시 (항상 최신 코드 반영)
-  if (path.endsWith('.html') || path === '/' || path.endsWith('.js')) {
+  // HTML, JS: 네트워크 우선 → 실패 시 캐시
+  if (path === '/' || path.endsWith('.html') || path.endsWith('.js')) {
     e.respondWith(
       fetch(e.request)
         .then(res => {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
           return res;
         })
         .catch(() => caches.match(e.request))
@@ -34,14 +37,8 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // CSS, 이미지 등: 캐시 우선
-  if (STATIC.some(s => path.endsWith(s.replace('/', '')))) {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request))
-    );
-    return;
-  }
-
-  // 오디오 스트림 등 외부 요청: 네트워크 직접
-  e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
+  // CSS, 이미지, 기타 정적 자산: 캐시 우선
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request))
+  );
 });
