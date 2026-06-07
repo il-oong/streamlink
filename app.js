@@ -820,12 +820,18 @@ const App = {
     this.state = 'loading';
     this._render();
 
-    // 재생 전 상대 컨트롤러 정지
+    const ytWrap = document.getElementById('ytPlayerWrap');
+    const waveform = document.getElementById('miniWaveform');
+
     if (YouTube.isYouTube(stream.url)) {
       AudioCtrl.stop();
+      if (ytWrap) ytWrap.hidden = false;
+      if (waveform) waveform.hidden = true;
       YouTubeCtrl.play(stream);
     } else {
       YouTubeCtrl.stop();
+      if (ytWrap) ytWrap.hidden = true;
+      if (waveform) waveform.hidden = false;
       AudioCtrl.play(stream);
     }
 
