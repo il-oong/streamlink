@@ -72,16 +72,6 @@ const Storage = {
 
 // ── YouTube 리졸버 ────────────────────────────────────
 const YouTube = {
-  // Piped 공개 인스턴스 목록 (순서대로 시도)
-  APIS: [
-    'https://pipedapi.tokhmi.xyz',
-    'https://pipedapi.moomoo.me',
-    'https://pipedapi.syncpundit.io',
-    'https://api.piped.projectsegfau.lt',
-    'https://pipedapi.kavin.rocks',
-    'https://pipedapi.adminforge.de',
-  ],
-
   extractId(url) {
     try {
       const u = new URL(url);
@@ -99,21 +89,10 @@ const YouTube = {
     const id = this.extractId(url);
     if (!id) throw new Error('유효하지 않은 YouTube URL입니다');
 
-    for (const base of this.APIS) {
-      try {
-        const res = await fetch(`${base}/streams/${id}`, { signal: AbortSignal.timeout(6000) });
-        if (!res.ok) continue;
-        const data = await res.json();
-
-        // 오디오 전용 스트림 중 가장 높은 bitrate 선택
-        const stream = (data.audioStreams || [])
-          .filter(s => s.url && s.mimeType)
-          .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-
-        if (stream?.url) return stream.url;
-      } catch {}
-    }
-    throw new Error('YouTube 오디오를 가져올 수 없습니다. 영상이 비공개이거나 지역 제한이 있을 수 있습니다');
+    const res = await fetch(`/api/youtube?id=${id}`, { signal: AbortSignal.timeout(15000) });
+    const data = await res.json();
+    if (!res.ok || !data.url) throw new Error(data.error || 'YouTube 오디오를 가져올 수 없습니다');
+    return data.url;
   }
 };
 
