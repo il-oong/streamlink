@@ -825,12 +825,12 @@ const App = {
 
     if (YouTube.isYouTube(stream.url)) {
       AudioCtrl.stop();
-      if (ytWrap) ytWrap.hidden = false;
+      if (ytWrap) ytWrap.classList.add('yt-active');
       if (waveform) waveform.hidden = true;
       YouTubeCtrl.play(stream);
     } else {
       YouTubeCtrl.stop();
-      if (ytWrap) ytWrap.hidden = true;
+      if (ytWrap) ytWrap.classList.remove('yt-active');
       if (waveform) waveform.hidden = false;
       AudioCtrl.play(stream);
     }
