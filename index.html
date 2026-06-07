@@ -28,11 +28,19 @@
           </svg>
           <span>StreamLink</span>
         </div>
-        <button class="btn-add" id="btnAdd" aria-label="URL 추가">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
+        <div class="header-actions">
+          <button class="btn-settings" id="btnSettings" aria-label="설정">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+          <button class="btn-add" id="btnAdd" aria-label="URL 추가">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -171,6 +179,32 @@
       </form>
       <!-- 삭제 버튼 (수정 모드에서만 표시) -->
       <button class="btn-pl-delete" id="btnDeletePl" hidden>이 플레이리스트 삭제</button>
+    </div>
+  </div>
+
+  <!-- 설정 모달 -->
+  <div class="modal-overlay" id="settingsOverlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="modal-header">
+        <h2 id="settingsTitle">설정</h2>
+        <button class="btn-close" id="btnCloseSettings" aria-label="닫기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <form class="modal-form" id="settingsForm">
+        <label class="form-label">
+          PC 서버 주소
+          <input type="url" id="inputServer" class="form-input" placeholder="https://....trycloudflare.com" autocomplete="off">
+          <span class="form-hint">YouTube 재생에 필요합니다. PC에서 start.bat 실행 후 나오는 주소를 붙여넣으세요.</span>
+          <span class="form-error" id="serverError"></span>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btnTestServer">연결 확인</button>
+          <button type="submit" class="btn-primary">저장</button>
+        </div>
+      </form>
     </div>
   </div>
 

@@ -4,7 +4,12 @@
 const Storage = {
   KEY: 'streamlink_streams',
   PL_KEY: 'streamlink_playlists',
+  SERVER_KEY: 'streamlink_server',
   ALL_ID: '__all__',
+
+  // ── PC 서버 주소 ──
+  getServer() { return (localStorage.getItem(this.SERVER_KEY) || '').replace(/\/+$/, ''); },
+  setServer(url) { localStorage.setItem(this.SERVER_KEY, url.trim()); },
 
   // ── 플레이리스트 ──
   getPlaylists() {
@@ -86,7 +91,9 @@ const YouTube = {
   async resolve(url) {
     const id = this.extractId(url);
     if (!id) throw new Error('유효하지 않은 YouTube URL입니다');
-    const res = await fetch(`/api/youtube?id=${id}`, { signal: AbortSignal.timeout(20000) });
+    const base = Storage.getServer();
+    if (!base) throw new Error('YouTube 재생은 PC 서버가 필요합니다. 설정(톱니바퀴)에서 주소를 등록하세요');
+    const res = await fetch(`${base}/youtube?id=${id}`, { signal: AbortSignal.timeout(25000) });
     const data = await res.json();
     if (!res.ok || !data.url) throw new Error(data.error || 'YouTube 오디오를 가져올 수 없습니다');
     return data.url;
@@ -236,6 +243,10 @@ const UI = {
   plInput:        document.getElementById('plInput'),
   plError:        document.getElementById('plError'),
   btnDeletePl:    document.getElementById('btnDeletePl'),
+  settingsOverlay: document.getElementById('settingsOverlay'),
+  settingsForm:    document.getElementById('settingsForm'),
+  inputServer:     document.getElementById('inputServer'),
+  serverError:     document.getElementById('serverError'),
 
   // XSS 방지: 브라우저 DOM이 인코딩 처리
   _esc(str) {
@@ -404,6 +415,15 @@ const UI = {
   },
 
   hidePlModal() { this.plModalOverlay.hidden = true; },
+
+  showSettings() {
+    this.settingsOverlay.hidden = false;
+    this.inputServer.value = Storage.getServer();
+    this.serverError.textContent = '';
+    setTimeout(() => this.inputServer.focus(), 50);
+  },
+
+  hideSettings() { this.settingsOverlay.hidden = true; },
 
   updatePlHeader(playlist, streamCount) {
     if (!playlist) {
@@ -584,12 +604,52 @@ const App = {
 
     UI.volumeSlider.addEventListener('input', e => AudioCtrl.setVolume(Number(e.target.value)));
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { UI.hideModal(); UI.hidePlModal(); }
+      if (e.key === 'Escape') { UI.hideModal(); UI.hidePlModal(); UI.hideSettings(); }
     });
 
     // PWA 설치 버튼
     document.getElementById('btnInstall')?.addEventListener('click', () => this._handleInstall());
     document.getElementById('btnPwaBannerClose')?.addEventListener('click', () => UI.hidePwaBanner());
+
+    // 설정
+    document.getElementById('btnSettings').addEventListener('click', () => UI.showSettings());
+    document.getElementById('btnCloseSettings').addEventListener('click', () => UI.hideSettings());
+    document.getElementById('settingsOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) UI.hideSettings();
+    });
+    UI.settingsForm.addEventListener('submit', e => { e.preventDefault(); this._handleSaveSettings(); });
+    document.getElementById('btnTestServer').addEventListener('click', () => this._handleTestServer());
+  },
+
+  async _handleTestServer() {
+    const url = UI.inputServer.value.trim().replace(/\/+$/, '');
+    if (!url) { UI.serverError.textContent = '주소를 입력하세요.'; return; }
+    UI.serverError.textContent = '확인 중...';
+    UI.serverError.style.color = '';
+    try {
+      const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(8000) });
+      const data = await res.json();
+      if (data.ok) {
+        UI.serverError.style.color = '#22c55e';
+        UI.serverError.textContent = '연결 성공! 저장을 누르세요.';
+      } else {
+        throw new Error('응답 형식 오류');
+      }
+    } catch {
+      UI.serverError.style.color = '';
+      UI.serverError.textContent = '연결 실패. 주소와 PC 서버 실행 상태를 확인하세요.';
+    }
+  },
+
+  _handleSaveSettings() {
+    const url = UI.inputServer.value.trim();
+    if (url && !/^https?:\/\//.test(url)) {
+      UI.serverError.textContent = 'https:// 로 시작하는 주소를 입력하세요.';
+      return;
+    }
+    Storage.setServer(url);
+    UI.hideSettings();
+    UI.showToast(url ? 'PC 서버 주소 저장됨' : '서버 주소 삭제됨');
   },
 
   _handleAddStream() {
